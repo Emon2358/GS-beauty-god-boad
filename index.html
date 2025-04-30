@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>GS音源対応 MIDI Webプレイヤー</title>
-  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.min.js"></script>
-  <script src="https://www.midijs.net/lib/midi.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.5/build/MIDIPlayer.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/syri-project/syri-music@latest/dist/syri-music.min.js"></script>
+  <!-- Tone.js も一部で使えるように残す -->
+  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.min.js" defer></script>
+  <script src="https://www.midijs.net/lib/midi.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.5/build/MIDIPlayer.min.js" defer></script>
+  <!-- 正しいSyriMusic読み込み -->
+  <script src="https://cdn.jsdelivr.net/npm/syri-music@0.2.2/dist/syri-music.min.js" defer></script>
   <style>
     body {
       font-family: sans-serif;
@@ -25,59 +27,43 @@
 
   <input type="file" id="midiFileInput" accept=".mid,.midi">
   <br>
-  <!-- <button onclick="playWithMIDIjs()">▶ MIDI.jsで再生</button> -->
-  <button onclick="playWithSyriMusic()">▶ SyriMusicで再生</button>
+  <button id="playButton">▶ SyriMusicで再生</button>
   <button onclick="stopPlayback()">⏹ 停止</button>
 
   <script>
-    let midiPlayer;
+    let syriPlayer;
 
     function stopPlayback() {
-      if (midiPlayer) midiPlayer.stop();
+      if (syriPlayer) syriPlayer.stop();
       if (typeof MIDI !== 'undefined') MIDI.stopAllNotes();
-      if (window.syriPlayer) window.syriPlayer.stop();
     }
 
-    // MIDI.jsの再生は無効化（サウンドフォントURLが無効なため）
-    // function playWithMIDIjs() {
-    //   const file = document.getElementById('midiFileInput').files[0];
-    //   if (!file) return alert("MIDIファイルを選択してください");
-
-    //   const reader = new FileReader();
-    //   reader.onload = function(e) {
-    //     MIDI.loadPlugin({
-    //       soundfontUrl: "<提供されていない>",
-    //       onsuccess: function() {
-    //         MIDI.Player.loadFile(e.target.result, () => {
-    //           MIDI.Player.start();
-    //         });
-    //       }
-    //     });
-    //   };
-    //   reader.readAsDataURL(file);
-    // }
-
-    // SyriMusic 再生（GS音源再現 + SysEx対応 + リバーブ + GSパラメータ）
-    function playWithSyriMusic() {
+    // AudioContextをユーザー操作後に開始
+    document.getElementById('playButton').addEventListener('click', async () => {
       const file = document.getElementById('midiFileInput').files[0];
       if (!file) return alert("MIDIファイルを選択してください");
 
+      // AudioContextのresume（ブラウザ制限対策）
+      if (Tone && Tone.context && Tone.context.state !== 'running') {
+        await Tone.start();
+      }
+
       const reader = new FileReader();
       reader.onload = async function(e) {
-        window.syriPlayer = new Syri.Player({
-          useReverb: true,           // GS音源の空間エフェクト再現
-          useChorus: true,           // コーラス（エンハンス）
-          enableSysEx: true,         // GSのSysEx対応を有効化
-          enableGS: true,            // GSモード強制有効化（必要に応じて）
-          gain: 1.0,                 // 音量（必要に応じて調整）
-          masterTuning: 440.0        // チューニング（Hz）
+        syriPlayer = new window.Syri.Player({
+          useReverb: true,
+          useChorus: true,
+          enableSysEx: true,
+          enableGS: true,
+          gain: 1.0,
+          masterTuning: 440.0
         });
 
-        await window.syriPlayer.load(e.target.result);
-        window.syriPlayer.play();
+        await syriPlayer.load(e.target.result);
+        syriPlayer.play();
       };
       reader.readAsArrayBuffer(file);
-    }
+    });
   </script>
 </body>
 </html>
